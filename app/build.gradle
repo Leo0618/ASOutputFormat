@@ -1,0 +1,60 @@
+apply plugin: 'com.android.application'
+
+android {
+    signingConfigs {
+        config {
+            keyAlias 'android'
+            keyPassword 'android'
+            storeFile file("../keystore/android.jks")
+            storePassword 'android'
+            v2SigningEnabled false
+        }
+    }
+
+    compileSdkVersion 27
+    defaultConfig {
+        applicationId "vip.okfood.outputformat"
+        minSdkVersion 16
+        targetSdkVersion 27
+        versionCode 1
+        versionName "1.0.0"
+        multiDexEnabled true
+        ndk {
+            abiFilters "armeabi-v7a"/*armeabi, "armeabi-v7a", "arm64-v8a", "x86", "x86_64"*/
+        }
+
+    }
+    buildTypes {
+        debug {
+            minifyEnabled false
+            zipAlignEnabled false
+            signingConfig signingConfigs.config
+        }
+        release {
+            minifyEnabled true
+            shrinkResources true
+            zipAlignEnabled true
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            signingConfig signingConfigs.config
+        }
+    }
+
+    sourceSets.main {
+        jniLibs.srcDir 'libs'
+    }
+
+//    flavorDimensions "default"
+//
+//    productFlavors {
+//        GF {
+//            dimension "default"
+//        }
+//    }
+}
+
+dependencies {
+    implementation fileTree(dir: 'libs', include: ['*.jar'])
+    implementation 'com.android.support:appcompat-v7:27.1.1'
+}
+
+apply from: '../output_format.gradle'

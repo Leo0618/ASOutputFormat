@@ -1,0 +1,148 @@
+/**
+ * function: 编译打包发布版本输出文件的转移，转移至项目根目录output文件夹目录下
+ * <ul>
+ *     <li>在app目录下的build.gradle文件末尾引用如下代码: apply from: '../output_format.gradle'</li>
+ *     <li>若定义了productFlavors，一个Flavor即可，多个会处理最后一个</li>
+ *     <li>正常流程打包输出目录在项目根目录的output文件夹下(包含apk和mapping)</li>
+ * </ul>
+ * Created by Leo on 2018/9/24.
+ */
+
+static String dateRelease() {
+    return new Date().format("yyyyMMdd", TimeZone.getTimeZone("UTC"))
+}
+
+/**
+ * 定义输出根目录名称
+ * @param versionName 可用的参数：当前打包版本名称
+ * @param versionCode 可用的参数：当前打包版本号码
+ * @param flavorName 可用的参数：flavor名称，此参数可能为空字符串
+ */
+@SuppressWarnings("GroovyUnusedDeclaration")
+static String outputFileDirName(versionName, versionCode, flavorName) {
+    return "output/app_release-v" + versionName + "-" + versionCode + "-" + dateRelease()
+}
+
+/**
+ * 定义输出mapping文件名称
+ * @param versionName 可用的参数：当前打包版本名称
+ * @param versionCode 可用的参数：当前打包版本号码
+ * @param flavorName 可用的参数：flavor名称，此参数可能为空字符串
+ */
+@SuppressWarnings("GroovyUnusedDeclaration")
+static String mappingFileName(versionName, versionCode, flavorName) {
+    return "mapping.txt"
+}
+
+/**
+ * 定义输出apk文件名称
+ * @param versionName 可用的参数：当前打包版本名称
+ * @param versionCode 可用的参数：当前打包版本号码
+ * @param flavorName 可用的参数：flavor名称，此参数可能为空字符串
+ */
+@SuppressWarnings("GroovyUnusedDeclaration")
+static String apkFileName(versionName, versionCode, flavorName) {
+    return "app-release-v" + versionName + "-" + versionCode + "-" + dateRelease() + ".apk"
+}
+
+/**
+ * 是否删除多渠道的原包apk目录
+ */
+static boolean deleteInitApk() {
+    return true
+}
+
+tasks.whenTaskAdded { task ->
+    int sizeOfProductFlavors = android.productFlavors.size()
+    if (sizeOfProductFlavors == 0) {
+        if (task.name.equalsIgnoreCase("assembleRelease")) {
+            task.doLast {
+                copyFile()
+            }
+        }
+    } else {
+        android.productFlavors.all { flavor ->
+            if (task.name.equalsIgnoreCase("assemble" + flavor.name + "Release")) {
+                task.doLast {
+                    copyFileWithVariant()
+                }
+            }
+        }
+    }
+}
+
+void copyFile() {
+    android.applicationVariants.all { variant ->
+        variant.outputs.all {
+            if (variant.buildType.name.equalsIgnoreCase("release")) {
+                String projectRootDir = "$rootDir"
+                //create root output dir
+                File outputFileDir = new File(projectRootDir + File.separator + outputFileDirName(android.defaultConfig.versionName, android.defaultConfig.versionCode, ""))
+                if (!outputFileDir.exists()) {
+                    outputFileDir.mkdirs()
+                }
+                //copy mapping
+                String mappingFileName = mappingFileName(android.defaultConfig.versionName, android.defaultConfig.versionCode, "")
+                File orgMappingFile = variant.mappingFile
+                if (orgMappingFile != null) {
+                    copy {
+                        from orgMappingFile.getParent()
+                        include "mapping.txt"
+                        into outputFileDir.getPath()
+                        rename {
+                            mappingFileName
+                        }
+                    }
+                }
+                //copy apk
+                File apkOrgFileDir = new File(projectRootDir + '/app/release')
+                String apkFileName = apkFileName(android.defaultConfig.versionName, android.defaultConfig.versionCode, "")
+                copy {
+                    from apkOrgFileDir.getPath() + File.separator
+                    include "*.apk"
+                    into outputFileDir.getPath()
+                    rename {
+                        apkFileName
+                    }
+                }
+                //delete init apks
+                if (deleteInitApk()) apkOrgFileDir.deleteDir()
+            }
+        }
+    }
+}
+
+void copyFileWithVariant() {
+    String projectRootDir = "$rootDir"
+    String flavorName = android.productFlavors[android.productFlavors.size() - 1].name
+    //create root output dir
+    File outputFileDir = new File(projectRootDir + File.separator + outputFileDirName(android.defaultConfig.versionName, android.defaultConfig.versionCode, flavorName))
+    if (!outputFileDir.exists()) {
+        outputFileDir.mkdirs()
+    }
+    //copy mapping
+    android.productFlavors.all { flavor ->
+        String mappingFileName = mappingFileName(android.defaultConfig.versionName, android.defaultConfig.versionCode, flavorName)
+        copy {
+            from "$buildDir" + '/outputs/mapping/' + flavorName + "/release"
+            include "mapping.txt"
+            into outputFileDir.getPath()
+            rename {
+                mappingFileName
+            }
+        }
+    }
+    //copy apk
+    File apkOrgFileDir = new File(projectRootDir + '/app/' + flavorName)
+    String apkFileName = apkFileName(android.defaultConfig.versionName, android.defaultConfig.versionCode, flavorName)
+    copy {
+        from apkOrgFileDir.getPath() + "/release/"
+        include "app-" + flavorName + "-release.apk"
+        into outputFileDir.getPath()
+        rename {
+            apkFileName
+        }
+    }
+    //delete init apks
+    if (deleteInitApk()) apkOrgFileDir.deleteDir()
+}
